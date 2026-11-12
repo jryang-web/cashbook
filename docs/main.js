@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
+import JsBarcode from 'https://esm.sh/jsbarcode@3.11.6';
 
 const url = 'https://jiofldtieaxlqykhylnc.supabase.co';
 const key = 'sb_publishable_UuhoeoVzriR7_vbZiD52_g_DCnP9fw0';
@@ -6,13 +7,28 @@ const db = createClient(url, key);
 const $ = (s) => document.querySelector(s);
 const app = $('#app');
 const categories = {expense:['餐飲','日用品','交通','居住','水電網路','醫療','教育','娛樂','其他'],income:['薪資','獎金','投資','補助','其他']};
-const state = {user:null, households:[], household:null, members:[], entries:[], month:new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Taipei'}).slice(0,7), tab:'home', kind:'expense', editing:null};
+const state = {user:null, carrier:null, households:[], household:null, members:[], entries:[], month:new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Taipei'}).slice(0,7), tab:'home', kind:'expense', editing:null};
 const money = n => new Intl.NumberFormat('zh-TW').format(n || 0);
 const esc = s => String(s ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const today = () => new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Taipei'});
 const icon = {home:'⌂',list:'☷',stats:'▥',family:'♧'};
 function toast(msg){ let el=$('#toast'); if(!el){el=document.createElement('div');el.id='toast';document.body.append(el)} el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),3500) }
 function error(e){toast(e?.message || '操作失敗，請稍後重試')}
+
+async function loadCarrier(){
+  const {data,error:e}=await db.from('ledger_carriers').select('carrier_code').eq('user_id',state.user.id).maybeSingle();
+  if(e) throw e;
+  state.carrier=data?.carrier_code||null;
+}
+function carrierPanel(){return `<section class="carrier-panel" aria-label="我的手機條碼"><div class="carrier-heading"><strong>我的手機條碼</strong><button id="carrier-edit" type="button">${state.carrier?'編輯':'設定條碼'}</button></div>${state.carrier?`<div class="carrier-graphic"><svg id="carrier-barcode" role="img" aria-label="手機條碼 ${esc(state.carrier)}"></svg><strong>${esc(state.carrier)}</strong></div>`:'<p>設定財政部核發的手機條碼，結帳時快速出示。</p>'}</section>`}
+function drawCarrier(){if(!state.carrier)return;try{JsBarcode('#carrier-barcode',state.carrier,{format:'CODE39',width:2,height:56,displayValue:false,margin:10,background:'#fff',lineColor:'#111'})}catch(e){error(e)}}
+function editCarrier(){
+  const layer=document.createElement('div');layer.className='modal-layer';
+  layer.innerHTML=`<div class="shade"></div><section class="sheet" role="dialog" aria-modal="true" aria-label="設定手機條碼"><div class="handle"></div><div class="sheet-head"><h2>設定手機條碼</h2><button id="close-carrier" aria-label="關閉">×</button></div><p class="carrier-help">請填入財政部核發的手機條碼，以 / 開頭，共 8 碼。這是你個人的條碼，不會分享給其他家庭成員。</p><form id="carrier-form"><label>手機條碼<input name="carrier" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="8" required placeholder="/E7E6888" value="${esc(state.carrier||'')}"></label><button class="primary">儲存手機條碼</button></form></section>`;
+  document.body.append(layer);const close=()=>layer.remove();layer.querySelector('#close-carrier').onclick=close;layer.querySelector('.shade').onclick=close;
+  const input=layer.querySelector('[name=carrier]');input.focus();
+  layer.querySelector('#carrier-form').onsubmit=async e=>{e.preventDefault();const value=input.value.trim().toUpperCase();if(!/^\/[0-9A-Z.+-]{7}$/.test(value)){toast('格式需為 / 開頭，後接 7 碼英數或 . + -');input.focus();return}const button=e.target.querySelector('button');button.disabled=true;try{const {error:err}=await db.from('ledger_carriers').upsert({user_id:state.user.id,carrier_code:value},{onConflict:'user_id'});if(err)throw err;state.carrier=value;close();render();toast('手機條碼已儲存')}catch(err){error(err)}finally{button.disabled=false}};
+}
 
 async function loadHouseholds(){
   const {data,error:e}=await db.from('ledger_households').select('id,name,invite_code,created_at').order('created_at');
@@ -31,7 +47,7 @@ async function loadData(){
   if(m.error||t.error)throw m.error||t.error;
   state.members=m.data||[];state.entries=t.data||[];
 }
-function shell(content){app.innerHTML=`<div class="app-shell"><header class="top"><div class="brand"><span class="brand-mark">⌂</span><span>家好帳<small>一起把生活記清楚</small></span></div><button class="avatar" id="menu" aria-label="家庭設定">${esc((state.members.find(x=>x.user_id===state.user.id)?.display_name||state.user.email||'我').slice(0,1))}</button></header><main>${content}</main><nav class="bottom" aria-label="主要選單">${[['home','總覽'],['list','明細'],['stats','統計'],['family','家庭']].map(([k,v])=>`<button class="${state.tab===k?'active':''}" data-tab="${k}"><span>${icon[k]}</span>${v}</button>`).join('')}</nav><button class="fab" id="add" aria-label="新增收支">＋</button></div>`;document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{state.tab=b.dataset.tab;render()});$('#menu').onclick=()=>{state.tab='family';render()};$('#add').onclick=()=>openEditor();}
+function shell(content){app.innerHTML=`<div class="app-shell"><header class="top"><div class="brand"><span class="brand-mark">⌂</span><span>家好帳<small>一起把生活記清楚</small></span></div><button class="avatar" id="menu" aria-label="家庭設定">${esc((state.members.find(x=>x.user_id===state.user.id)?.display_name||state.user.email||'我').slice(0,1))}</button></header>${carrierPanel()}<main>${content}</main><nav class="bottom" aria-label="主要選單">${[['home','總覽'],['list','明細'],['stats','統計'],['family','家庭']].map(([k,v])=>`<button class="${state.tab===k?'active':''}" data-tab="${k}"><span>${icon[k]}</span>${v}</button>`).join('')}</nav><button class="fab" id="add" aria-label="新增收支">＋</button></div>`;document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{state.tab=b.dataset.tab;render()});$('#menu').onclick=()=>{state.tab='family';render()};$('#add').onclick=()=>openEditor();$('#carrier-edit').onclick=editCarrier;drawCarrier()}
 function monthBar(){return `<div class="monthbar"><button id="prev" aria-label="上個月">‹</button><strong>${state.month.replace('-',' 年 ')} 月</strong><button id="next" aria-label="下個月">›</button></div>`}
 function bindMonth(){ const move=n=>{const [y,m]=state.month.split('-').map(Number);const d=new Date(y,m-1+n,1);state.month=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;refresh()};$('#prev').onclick=()=>move(-1);$('#next').onclick=()=>move(1)}
 function totals(){return state.entries.reduce((a,x)=>(a[x.kind]+=x.amount,a),{expense:0,income:0})}
@@ -64,4 +80,4 @@ function openEditor(item=null){state.editing=item;state.kind=item?.kind||'expens
  layer.querySelector('#entryform').onsubmit=async e=>{e.preventDefault();const f=e.target;const next=e.submitter?.classList.contains('save-next');const fields=f.elements;const payload={household_id:state.household.id,user_id:state.user.id,kind:state.kind,amount:Number(fields.namedItem('amount').value),category:fields.namedItem('category').value,note:fields.namedItem('note').value.trim(),occurred_on:fields.namedItem('date').value};f.querySelectorAll('button').forEach(b=>b.disabled=true);try{const result=item?await db.from('ledger_entries').update(payload).eq('id',item.id).eq('user_id',state.user.id):await db.from('ledger_entries').insert(payload);if(result.error)throw result.error;localStorage.setItem(`ledger-category-${state.kind}`,payload.category);state.month=payload.occurred_on.slice(0,7);if(!next)close();await refresh();if(next){fields.namedItem('amount').value='';fields.namedItem('note').value='';fields.namedItem('amount').focus()}toast(item?'已更新紀錄':'已儲存紀錄')}catch(err){error(err)}finally{f.querySelectorAll('button').forEach(b=>b.disabled=false)}};
  if(item)layer.querySelector('#delete').onclick=async()=>{if(!confirm('確定刪除這筆紀錄？此操作無法復原。'))return;try{const {error:e}=await db.from('ledger_entries').delete().eq('id',item.id).eq('user_id',state.user.id);if(e)throw e;close();await refresh();toast('已刪除紀錄')}catch(err){error(err)}};
 }
-db.auth.onAuthStateChange(async(_event,session)=>{state.user=session?.user||null;if(!state.user){state.household=null;state.entries=[];render();return}try{await loadHouseholds();render()}catch(e){error(e);render()}});
+db.auth.onAuthStateChange(async(_event,session)=>{state.user=session?.user||null;if(!state.user){state.household=null;state.entries=[];state.carrier=null;render();return}try{await Promise.all([loadHouseholds(),loadCarrier()]);render()}catch(e){error(e);render()}});
