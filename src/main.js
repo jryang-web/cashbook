@@ -80,4 +80,21 @@ function openEditor(item=null){state.editing=item;state.kind=item?.kind||'expens
  layer.querySelector('#entryform').onsubmit=async e=>{e.preventDefault();const f=e.target;const next=e.submitter?.classList.contains('save-next');const fields=f.elements;const payload={household_id:state.household.id,user_id:state.user.id,kind:state.kind,amount:Number(fields.namedItem('amount').value),category:fields.namedItem('category').value,note:fields.namedItem('note').value.trim(),occurred_on:fields.namedItem('date').value};f.querySelectorAll('button').forEach(b=>b.disabled=true);try{const result=item?await db.from('ledger_entries').update(payload).eq('id',item.id).eq('user_id',state.user.id):await db.from('ledger_entries').insert(payload);if(result.error)throw result.error;localStorage.setItem(`ledger-category-${state.kind}`,payload.category);state.month=payload.occurred_on.slice(0,7);if(!next)close();await refresh();if(next){fields.namedItem('amount').value='';fields.namedItem('note').value='';fields.namedItem('amount').focus()}toast(item?'已更新紀錄':'已儲存紀錄')}catch(err){error(err)}finally{f.querySelectorAll('button').forEach(b=>b.disabled=false)}};
  if(item)layer.querySelector('#delete').onclick=async()=>{if(!confirm('確定刪除這筆紀錄？此操作無法復原。'))return;try{const {error:e}=await db.from('ledger_entries').delete().eq('id',item.id).eq('user_id',state.user.id);if(e)throw e;close();await refresh();toast('已刪除紀錄')}catch(err){error(err)}};
 }
-db.auth.onAuthStateChange(async(_event,session)=>{state.user=session?.user||null;if(!state.user){state.household=null;state.entries=[];state.carrier=null;render();return}try{await Promise.all([loadHouseholds(),loadCarrier()]);render()}catch(e){error(e);render()}});
+let authVersion=0;
+db.auth.onAuthStateChange((_event,session)=>{
+  const version=++authVersion;
+  state.user=session?.user||null;
+  if(!state.user){state.household=null;state.entries=[];state.carrier=null;render();return}
+  // Finish the auth callback before querying Supabase to avoid locking session access.
+  setTimeout(async()=>{
+    try{
+      await Promise.all([loadHouseholds(),loadCarrier()]);
+      if(version===authVersion)render();
+    }catch(e){
+      if(version!==authVersion)return;
+      app.innerHTML='<div class="setup"><h1>載入帳本時發生問題</h1><p>請重新整理頁面再試一次。</p><button class="primary" id="retry-load">重新載入</button></div>';
+      $('#retry-load').onclick=()=>location.reload();error(e);
+    }
+  },0);
+});
+app.innerHTML='<div class="setup"><p>正在載入家好帳…</p></div>';
