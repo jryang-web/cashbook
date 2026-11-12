@@ -83,4 +83,3 @@ revoke all on function public.ledger_join_household(uuid,text) from public, anon
 grant execute on function public.ledger_create_household(text,text), public.ledger_join_household(uuid,text) to authenticated;
 grant select on public.ledger_households, public.ledger_members to authenticated;
 grant select, insert, update, delete on public.ledger_entries to authenticated;
-
