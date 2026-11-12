@@ -1,11 +1,12 @@
 # 家好帳
 
-手機優先的家庭收支簿。使用 Supabase Auth、Postgres 與 RLS；金額以新台幣整數儲存。
+手機優先的家庭收支簿。使用 Supabase Google OAuth、Postgres 與 RLS；金額以新台幣整數儲存。
 
 ## 啟動
 
 1. 在 Supabase 專案執行 `supabase/migrations/20261112_family_ledger.sql`。
 2. 可直接將 `docs/` 設定為 GitHub Pages 的 `main` 分支網站目錄，或放到其他 HTTPS 靜態託管。`main.js` 中僅含公開的 publishable key，絕不可放入 service role key。Supabase 客戶端由 esm.sh 載入，需網路連線。
-3. Supabase Authentication → URL Configuration 中設定正式網站的 Site URL 與 Redirect URLs。電子郵件 OTP／Magic Link 須啟用。
+3. Supabase Authentication → URL Configuration 中將 Site URL 與 Redirect URLs 設為 `https://jryang-web.github.io/cashbook/`。
+4. 在 Google Cloud 建立 Web application OAuth Client。Authorized JavaScript origins 設為 `https://jryang-web.github.io`；Authorized redirect URI 使用 Supabase Authentication → Providers → Google 頁面顯示的 callback URL，通常為 `https://jiofldtieaxlqykhylnc.supabase.co/auth/v1/callback`。將 Client ID 和 Client Secret 填入 Supabase 的 Google provider，啟用後再測試登入。請勿把 Client Secret 放進程式庫。
 
 新用戶先以電子郵件登入，建立家庭後複製邀請碼給家人。邀請碼視同加入權限，請只分享給家人。每人可有不同家庭；介面目前一次顯示一個家庭。刪除紀錄不可復原。
