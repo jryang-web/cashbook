@@ -1,12 +1,11 @@
-# �a�n�b
+# 家好帳
 
-����u�����a�x����ï�C�ϥ� Supabase Auth�BPostgres �P RLS�F���B�H�s�x������x�s�C
+手機優先的家庭收支簿。使用 Supabase Auth、Postgres 與 RLS；金額以新台幣整數儲存。
 
-## �Ұ�
+## 啟動
 
-1. �b Supabase �M�װ��� `supabase/migrations/20261112_family_ledger.sql`�C
-2. �i�����N `docs/` �]�w�� GitHub Pages �� `main` ��������ؿ��A�Ω���L HTTPS �R�A�U�ޡC`main.js` ���ȧt���}�� publishable key�A�����i��J service role key�CSupabase �Ȥ�ݥ� esm.sh ���J�A�ݺ����s�u�C
-3. Supabase Authentication �� URL Configuration ���]�w���������� Site URL �P Redirect URLs�C�q�l�l�� OTP��Magic Link ���ҥΡC
+1. 在 Supabase 專案執行 `supabase/migrations/20261112_family_ledger.sql`。
+2. 可直接將 `docs/` 設定為 GitHub Pages 的 `main` 分支網站目錄，或放到其他 HTTPS 靜態託管。`main.js` 中僅含公開的 publishable key，絕不可放入 service role key。Supabase 客戶端由 esm.sh 載入，需網路連線。
+3. Supabase Authentication → URL Configuration 中設定正式網站的 Site URL 與 Redirect URLs。電子郵件 OTP／Magic Link 須啟用。
 
-�s�Τ���H�q�l�l��n�J�A�إ߮a�x��ƻs�ܽнX���a�H�C�ܽнX���P�[�J�v���A�Хu���ɵ��a�H�C�C�H�i�����P�a�x�F�����ثe�@����ܤ@�Ӯa�x�C�R���������i�_��C
-
+新用戶先以電子郵件登入，建立家庭後複製邀請碼給家人。邀請碼視同加入權限，請只分享給家人。每人可有不同家庭；介面目前一次顯示一個家庭。刪除紀錄不可復原。
