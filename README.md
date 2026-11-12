@@ -4,6 +4,10 @@
 
 登入後可立即記錄個人收入與支出，不必先建立家庭。既有紀錄依原記錄者列入個人帳本。使用「群組」建立或加入家庭後，「合併」頁會彙總群組所有成員的個人紀錄；新增紀錄仍儲存到自己的個人帳本。加入家庭群組代表成員可以查看彼此的個人收支，請只分享邀請碼給信任的家人。部署前需在 Supabase 套用 `supabase/migrations/20261112_personal_ledger_group_merge.sql`。
 
+## 家庭管理後台
+
+`/admin.html` 使用原有 Google OAuth 登入。只有建立該家庭群組的帳號可管理群組名稱、成員稱呼、移出成員和修改成員紀錄。後台不建立 Google 帳號，也不允許管理其他群組。修改成員紀錄會同步影響其個人帳本；所有管理操作記錄在 `ledger_admin_audit`。需先在 Supabase 套用 `supabase/migrations/20261112_group_admin.sql`。
+
 手機優先的家庭收支簿。使用 Supabase Google OAuth、Postgres 與 RLS；金額以新台幣整數儲存。
 
 ## 啟動
